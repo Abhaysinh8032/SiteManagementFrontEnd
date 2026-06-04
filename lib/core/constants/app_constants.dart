@@ -24,9 +24,20 @@ class AppConstants {
   static const String endpointLogin = '/api/auth/login';
   static const String endpointSignup = '/api/auth/signup';
 
-  // ── Routes ────────────────────────────────────────────────────────────────
+  // Site endpoints
+  static const String endpointSites = '/api/sites';
+  static const String endpointSiteMembers = '/api/sites/{id}/members';
+
+
+  // Task endpoints
+  static const String endpointTasks = '/api/tasks';
+  static const String endpointSiteTasks = '/api/tasks/site/{siteId}';
+  static const String endpointAllActiveUsers = '/api/admin/users/active';
+
+  // Routes
   static const String routeLogin = '/login';
   static const String routeSignup = '/signup';
+  static const String routeHome = '/home';
   static const String routeAdminHome = '/admin/home';
   static const String routeWorkerHome = '/worker/home';
 }

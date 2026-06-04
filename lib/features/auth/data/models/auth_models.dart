@@ -6,18 +6,11 @@ class LoginRequest {
   final String employeeId;
   final String password;
   final String? fcmToken;
-
-  const LoginRequest({
-    required this.employeeId,
-    required this.password,
-    this.fcmToken,
-  });
-
+  const LoginRequest({required this.employeeId, required this.password, this.fcmToken});
   Map<String, dynamic> toJson() => {
-        'employeeId': employeeId,
-        'password': password,
-        if (fcmToken != null) 'fcmToken': fcmToken,
-      };
+    'employeeId': employeeId, 'password': password,
+    if (fcmToken != null) 'fcmToken': fcmToken,
+  };
 }
 
 class SignupRequest {

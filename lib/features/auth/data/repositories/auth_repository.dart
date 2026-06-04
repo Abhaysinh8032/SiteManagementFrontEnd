@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/secure_storage_service.dart';
@@ -13,12 +14,12 @@ class AuthResult {
 
   const AuthResult._({this.data, this.errorMessage, this.isPending = false});
 
-  factory AuthResult.success(AuthResponse data) =>
-      AuthResult._(data: data);
+  factory AuthResult.success(AuthResponse data) => AuthResult._(data: data);
 
-  factory AuthResult.pending() =>
-      AuthResult._(isPending: true,
-          errorMessage: 'Your account is awaiting supervisor approval.');
+  factory AuthResult.pending() => const AuthResult._(
+    isPending: true,
+    errorMessage: 'Your account is awaiting supervisor approval.',
+  );
 
   factory AuthResult.failure(String message) =>
       AuthResult._(errorMessage: message);
@@ -30,29 +31,38 @@ class AuthRepository {
   final Dio _dio;
   final SecureStorageService _storage;
 
-  AuthRepository({
-    required SecureStorageService storage,
-  })  : _dio     = ApiClient.instance.dio,
-        _storage = storage;
+  AuthRepository({required SecureStorageService storage})
+    : _dio = ApiClient.instance.dio,
+      _storage = storage;
 
   // ── Login ─────────────────────────────────────────────────────────────────
 
   Future<AuthResult> login(LoginRequest request) async {
     try {
+      debugPrint(
+        '[AuthRepository] 📥 Login requested for: ${request.employeeId}',
+      );
       final response = await _dio.post(
         AppConstants.endpointLogin,
         data: request.toJson(),
       );
 
+      debugPrint('[AuthRepository] ✓ Login successful');
       final authResponse = AuthResponse.fromJson(
-          response.data as Map<String, dynamic>);
+        response.data as Map<String, dynamic>,
+      );
 
       await _persistSession(authResponse);
       return AuthResult.success(authResponse);
     } on DioException catch (e) {
-      return AuthResult.failure(_parseDioError(e));
+      final errorMsg = _parseDioError(e);
+      debugPrint('[AuthRepository] ✗ Login failed: $errorMsg');
+      return AuthResult.failure(errorMsg);
     } catch (e) {
-      return AuthResult.failure('An unexpected error occurred. Please try again.');
+      debugPrint('[AuthRepository] ✗ Unexpected error during login: $e');
+      return AuthResult.failure(
+        'An unexpected error occurred. Please try again.',
+      );
     }
   }
 
@@ -60,6 +70,9 @@ class AuthRepository {
 
   Future<AuthResult> signup(SignupRequest request) async {
     try {
+      debugPrint(
+        '[AuthRepository] 📥 Signup requested for: ${request.employeeId}',
+      );
       final response = await _dio.post(
         AppConstants.endpointSignup,
         data: request.toJson(),
@@ -71,16 +84,25 @@ class AuthRepository {
       // Check if data contains a token — if not, user is PENDING
       final dataMap = body['data'] as Map<String, dynamic>?;
       if (dataMap == null || !dataMap.containsKey('token')) {
+        debugPrint(
+          '[AuthRepository] ⏳ Signup successful but account pending approval',
+        );
         return AuthResult.pending();
       }
 
+      debugPrint('[AuthRepository] ✓ Signup successful');
       final authResponse = AuthResponse.fromSignupJson(body);
       await _persistSession(authResponse);
       return AuthResult.success(authResponse);
     } on DioException catch (e) {
-      return AuthResult.failure(_parseDioError(e));
+      final errorMsg = _parseDioError(e);
+      debugPrint('[AuthRepository] ✗ Signup failed: $errorMsg');
+      return AuthResult.failure(errorMsg);
     } catch (e) {
-      return AuthResult.failure('An unexpected error occurred. Please try again.');
+      debugPrint('[AuthRepository] ✗ Unexpected error during signup: $e');
+      return AuthResult.failure(
+        'An unexpected error occurred. Please try again.',
+      );
     }
   }
 
@@ -104,52 +126,50 @@ class AuthRepository {
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   Future<void> _persistSession(AuthResponse auth) async {
-    await _storage.saveSession(
-      token:       auth.token,
-      expiresInMs: auth.expiresInMs,
-      userId:      auth.user.id,
-      employeeId:  auth.user.employeeId,
-      userName:    auth.user.name,
-      role:        auth.user.role,
-      status:      auth.user.status,
+    debugPrint('[AuthRepository] 💾 Saving session...');
+    debugPrint(
+      '[AuthRepository]   Token: ${auth.token.substring(0, 20)}... (${auth.token.length} chars)',
     );
+    debugPrint('[AuthRepository]   Expires in: ${auth.expiresInMs}ms');
+    debugPrint(
+      '[AuthRepository]   User: ${auth.user.name} (${auth.user.role})',
+    );
+
+    await _storage.saveSession(
+      token: auth.token,
+      expiresInMs: auth.expiresInMs,
+      userId: auth.user.id,
+      employeeId: auth.user.employeeId,
+      userName: auth.user.name,
+      role: auth.user.role,
+      status: auth.user.status,
+    );
+
+    debugPrint('[AuthRepository] ✓ Session saved successfully');
   }
 
   String _parseDioError(DioException e) {
     if (e.response != null) {
-      final statusCode = e.response!.statusCode;
-      final body       = e.response!.data;
-
-      // Try to extract backend message from response body
-      String? backendMessage;
+      final body = e.response!.data;
       if (body is Map) {
-        backendMessage = body['message'] as String?;
+        final msg = body['message'] as String?;
+        if (msg != null && msg.isNotEmpty) return msg;
       }
-
-      if (backendMessage != null && backendMessage.isNotEmpty) {
-        return backendMessage;
-      }
-
-      switch (statusCode) {
-        case 400: return 'Invalid request. Please check your inputs.';
-        case 401: return 'Invalid Employee ID or password.';
-        case 403: return backendMessage ?? 'Access denied. Check your account status.';
-        case 404: return 'Service not found. Please contact support.';
-        case 409: return 'Employee ID already registered.';
-        case 500: return 'Server error. Please try again later.';
-        default:  return 'Request failed (code $statusCode).';
+      switch (e.response!.statusCode) {
+        case 401:
+          return 'Invalid Employee ID or password.';
+        case 403:
+          return 'Access denied. Check your account status.';
+        case 409:
+          return 'Employee ID already registered.';
+        default:
+          return 'Request failed (${e.response!.statusCode}).';
       }
     }
-
     if (e.type == DioExceptionType.connectionTimeout ||
-        e.type == DioExceptionType.receiveTimeout) {
-      return 'Connection timed out. Check your internet connection.';
-    }
-
-    if (e.type == DioExceptionType.connectionError) {
+        e.type == DioExceptionType.connectionError) {
       return 'Cannot reach server. Check your internet connection.';
     }
-
     return 'Network error. Please try again.';
   }
 }

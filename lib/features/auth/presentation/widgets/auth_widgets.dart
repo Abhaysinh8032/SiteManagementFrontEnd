@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -25,7 +26,7 @@ class AuthBrandHeader extends StatelessWidget {
           width: 80,
           height: 80,
           decoration: BoxDecoration(
-            gradient: AppTheme.primaryGradient,
+            gradient: AppTheme.backgroundGradient,
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
@@ -88,12 +89,12 @@ class _AuthTextFieldState extends State<AuthTextField> {
   @override
   Widget build(BuildContext context) {
     return TextFormField(
-      controller:        widget.controller,
-      obscureText:       widget.isPassword && _obscure,
-      keyboardType:      widget.keyboardType,
-      textInputAction:   widget.textInputAction,
-      onFieldSubmitted:  widget.onFieldSubmitted,
-      validator:         widget.validator,
+      controller: widget.controller,
+      obscureText: widget.isPassword && _obscure,
+      keyboardType: widget.keyboardType,
+      textInputAction: widget.textInputAction,
+      onFieldSubmitted: widget.onFieldSubmitted,
+      validator: widget.validator,
       style: GoogleFonts.lato(
         fontSize: 15,
         color: AppTheme.textPrimary,
@@ -101,12 +102,14 @@ class _AuthTextFieldState extends State<AuthTextField> {
       ),
       decoration: InputDecoration(
         labelText: widget.label,
-        hintText:  widget.hint,
+        hintText: widget.hint,
         prefixIcon: Icon(widget.prefixIcon, size: 20),
         suffixIcon: widget.isPassword
             ? IconButton(
                 icon: Icon(
-                  _obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                  _obscure
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined,
                   size: 20,
                 ),
                 onPressed: () => setState(() => _obscure = !_obscure),
@@ -141,8 +144,10 @@ class AuthPrimaryButton extends StatelessWidget {
       child: DecoratedBox(
         decoration: BoxDecoration(
           gradient: onPressed != null
-              ? AppTheme.primaryGradient
-              : const LinearGradient(colors: [Color(0xFFCCC0B8), Color(0xFFCCC0B8)]),
+              ? AppTheme.backgroundGradient
+              : const LinearGradient(
+                  colors: [Color(0xFFCCC0B8), Color(0xFFCCC0B8)],
+                ),
           borderRadius: BorderRadius.circular(14),
           boxShadow: onPressed != null
               ? [
@@ -150,7 +155,7 @@ class AuthPrimaryButton extends StatelessWidget {
                     color: AppTheme.primary.withOpacity(0.40),
                     blurRadius: 16,
                     offset: const Offset(0, 6),
-                  )
+                  ),
                 ]
               : [],
         ),
@@ -160,7 +165,8 @@ class AuthPrimaryButton extends StatelessWidget {
             backgroundColor: Colors.transparent,
             shadowColor: Colors.transparent,
             shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14)),
+              borderRadius: BorderRadius.circular(14),
+            ),
           ),
           child: isLoading
               ? const SizedBox(

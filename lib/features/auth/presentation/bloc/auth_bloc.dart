@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart';
 import '../../data/models/auth_models.dart';
 import '../../data/repositories/auth_repository.dart';
 
@@ -117,15 +118,14 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
   Future<void> _onCheckSession(
       AuthCheckSessionRequested event, Emitter<AuthState> emit) async {
+    debugPrint('[AuthBloc] 📥 AuthCheckSessionRequested');
     emit(const AuthCheckingSession());
     final role = await _repository.checkExistingSession();
     if (role != null) {
-      // Valid token exists — we don't have full AuthResponse here,
-      // but router will use the role to redirect correctly.
-      // Emit unauthenticated as a signal, router reads stored role.
-      // In Cycle 2: call /api/auth/me to get fresh user data.
-      emit(const AuthUnauthenticated()); // placeholder — router checks storage directly
+      debugPrint('[AuthBloc] ✓ Valid session found for role: $role');
+      emit(const AuthUnauthenticated());
     } else {
+      debugPrint('[AuthBloc] ✗ No valid session found');
       emit(const AuthUnauthenticated());
     }
   }
@@ -134,19 +134,21 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
   Future<void> _onLogin(
       AuthLoginRequested event, Emitter<AuthState> emit) async {
+    debugPrint('[AuthBloc] 📥 AuthLoginRequested for: ${event.employeeId}');
     emit(const AuthLoading());
 
     final result = await _repository.login(
       LoginRequest(
         employeeId: event.employeeId.trim(),
         password:   event.password,
-        // TODO Cycle 2: pass FCM token from FirebaseMessaging.instance.getToken()
       ),
     );
 
     if (result.isSuccess) {
+      debugPrint('[AuthBloc] ✓ Login successful, emitting AuthAuthenticated');
       emit(AuthAuthenticated(result.data!));
     } else {
+      debugPrint('[AuthBloc] ✗ Login failed: ${result.errorMessage}');
       emit(AuthError(result.errorMessage!));
     }
   }
@@ -155,6 +157,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
   Future<void> _onSignup(
       AuthSignupRequested event, Emitter<AuthState> emit) async {
+    debugPrint('[AuthBloc] 📥 AuthSignupRequested for: ${event.employeeId}');
     emit(const AuthLoading());
 
     final result = await _repository.signup(
@@ -168,10 +171,13 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     );
 
     if (result.isSuccess) {
+      debugPrint('[AuthBloc] ✓ Signup successful, emitting AuthAuthenticated');
       emit(AuthAuthenticated(result.data!));
     } else if (result.isPending) {
+      debugPrint('[AuthBloc] ⏳ Signup pending approval');
       emit(const AuthPendingApproval());
     } else {
+      debugPrint('[AuthBloc] ✗ Signup failed: ${result.errorMessage}');
       emit(AuthError(result.errorMessage!));
     }
   }

@@ -1,4 +1,5 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter/foundation.dart';
 import '../constants/app_constants.dart';
 
 /// Handles all secure local persistence:
@@ -13,10 +14,10 @@ class SecureStorageService {
   final FlutterSecureStorage _storage;
 
   SecureStorageService()
-      : _storage = const FlutterSecureStorage(
-          aOptions: AndroidOptions(encryptedSharedPreferences: true),
-          iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
-        );
+    : _storage = const FlutterSecureStorage(
+        aOptions: AndroidOptions(encryptedSharedPreferences: true),
+        iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+      );
 
   // ── Save session after successful login / signup ──────────────────────────
 
@@ -29,58 +30,78 @@ class SecureStorageService {
     required String role,
     required String status,
   }) async {
-    final expiryTimestamp =
-        DateTime.now().millisecondsSinceEpoch + expiresInMs;
+    // Safeguard: If the backend sends expiration in seconds (e.g., 3600 for 1 hr),
+    // it needs to be converted to milliseconds. Anything less than 1 year in seconds (31536000)
+    // is safely treated as seconds.
+    final int safeExpiresInMs = expiresInMs < 31536000
+        ? expiresInMs * 1000
+        : expiresInMs;
 
-    await Future.wait([
-      _storage.write(key: AppConstants.keyToken, value: token),
-      _storage.write(key: AppConstants.keyTokenExpiry, value: expiryTimestamp.toString()),
-      _storage.write(key: AppConstants.keyUserId, value: userId),
-      _storage.write(key: AppConstants.keyEmployeeId, value: employeeId),
-      _storage.write(key: AppConstants.keyUserName, value: userName),
-      _storage.write(key: AppConstants.keyUserRole, value: role),
-      _storage.write(key: AppConstants.keyUserStatus, value: status),
-    ]);
+    final expiry = DateTime.now().millisecondsSinceEpoch + safeExpiresInMs;
+    await _storage.write(key: AppConstants.keyToken, value: token);
+    await _storage.write(key: AppConstants.keyTokenExpiry, value: expiry.toString());
+    await _storage.write(key: AppConstants.keyUserId, value: userId);
+    await _storage.write(key: AppConstants.keyEmployeeId, value: employeeId);
+    await _storage.write(key: AppConstants.keyUserName, value: userName);
+    await _storage.write(key: AppConstants.keyUserRole, value: role);
+    await _storage.write(key: AppConstants.keyUserStatus, value: status);
   }
 
   // ── Auto-login: returns token only if it hasn't expired ───────────────────
 
   Future<String?> getValidToken() async {
-    final token  = await _storage.read(key: AppConstants.keyToken);
-    final expiry = await _storage.read(key: AppConstants.keyTokenExpiry);
+    try {
+      final token = await _storage.read(key: AppConstants.keyToken);
+      final expiry = await _storage.read(key: AppConstants.keyTokenExpiry);
 
-    if (token == null || expiry == null) return null;
+      debugPrint('[SecureStorage] Checking token validity...');
+      debugPrint(
+        '[SecureStorage]   Token stored: ${token != null ? 'YES' : 'NO'}',
+      );
+      debugPrint(
+        '[SecureStorage]   Expiry stored: ${expiry != null ? 'YES' : 'NO'}',
+      );
 
-    final expiryTime = int.tryParse(expiry) ?? 0;
-    final now        = DateTime.now().millisecondsSinceEpoch;
+      if (token == null || expiry == null) {
+        debugPrint('[SecureStorage] ✗ Token or expiry missing');
+        return null;
+      }
 
-    // Add 60s buffer — don't use a token that expires in the next minute
-    if (now >= expiryTime - 60000) {
-      await clearSession(); // expired — clean up
+      final expiryTime = int.tryParse(expiry) ?? 0;
+      final nowMs = DateTime.now().millisecondsSinceEpoch;
+      final expiresInMs = expiryTime - nowMs;
+
+      debugPrint(
+        '[SecureStorage]   Expires in: ${expiresInMs}ms (${(expiresInMs / 60000).toStringAsFixed(1)} minutes)',
+      );
+
+      if (nowMs >= expiryTime - 60000) {
+        debugPrint('[SecureStorage] ✗ Token expired - clearing session');
+        await clearSession();
+        return null;
+      }
+
+      debugPrint('[SecureStorage] ✓ Token is valid');
+      return token;
+    } catch (e) {
+      debugPrint('[SecureStorage] ✗ ERROR reading token: $e');
       return null;
     }
-
-    return token;
   }
 
   // ── Read cached user info (for dashboard pre-fill) ────────────────────────
 
   Future<Map<String, String?>> getCachedUser() async {
     return {
-      'userId':     await _storage.read(key: AppConstants.keyUserId),
+      'userId': await _storage.read(key: AppConstants.keyUserId),
       'employeeId': await _storage.read(key: AppConstants.keyEmployeeId),
-      'name':       await _storage.read(key: AppConstants.keyUserName),
-      'role':       await _storage.read(key: AppConstants.keyUserRole),
-      'status':     await _storage.read(key: AppConstants.keyUserStatus),
+      'name': await _storage.read(key: AppConstants.keyUserName),
+      'role': await _storage.read(key: AppConstants.keyUserRole),
+      'status': await _storage.read(key: AppConstants.keyUserStatus),
     };
   }
 
-  Future<String?> getRole() =>
-      _storage.read(key: AppConstants.keyUserRole);
+  Future<String?> getRole() => _storage.read(key: AppConstants.keyUserRole);
 
-  // ── Clear on logout ───────────────────────────────────────────────────────
-
-  Future<void> clearSession() async {
-    await _storage.deleteAll();
-  }
+  Future<void> clearSession() => _storage.deleteAll();
 }
