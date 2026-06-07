@@ -12,20 +12,17 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // ── Wire up dependencies ────────────────────────────────────────────────
-  final storage        = SecureStorageService();
-  ApiClient.instance.init(storage);                        // init Dio with storage
+  final storage = SecureStorageService();
+  ApiClient.instance.init(storage); // init Dio with storage
   final authRepository = AuthRepository(storage: storage);
-  final appRouter      = AppRouter(storage);
+  final appRouter = AppRouter(storage);
 
-  runApp(SiteTrackerApp(
-    authRepository: authRepository,
-    appRouter:      appRouter,
-  ));
+  runApp(SiteTrackerApp(authRepository: authRepository, appRouter: appRouter));
 }
 
 class SiteTrackerApp extends StatelessWidget {
   final AuthRepository authRepository;
-  final AppRouter      appRouter;
+  final AppRouter appRouter;
 
   const SiteTrackerApp({
     super.key,
@@ -47,10 +44,10 @@ class SiteTrackerApp extends StatelessWidget {
         // BlocProvider<TaskBloc>(create: (_) => TaskBloc(...)),
       ],
       child: MaterialApp.router(
-        title:              'SiteTracker',
+        title: 'SiteTracker',
         debugShowCheckedModeBanner: false,
-        theme:              AppTheme.light,
-        routerConfig:       appRouter.router,
+        theme: AppTheme.light,
+        routerConfig: appRouter.router,
       ),
     );
   }
