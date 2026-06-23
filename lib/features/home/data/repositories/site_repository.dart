@@ -9,83 +9,123 @@ class SiteRepository {
 
   Future<List<SiteModel>> getSites() async {
     try {
-      debugPrint('[SiteRepository] Fetching sites from: ${AppConstants.endpointSites}');
+      debugPrint('[SiteRepository] Fetching sites');
       final r = await _dio.get(AppConstants.endpointSites);
-      debugPrint('[SiteRepository] ✓ Sites loaded. Count: ${r.data.length}');
+      debugPrint('[SiteRepository] ✓ Sites: ${r.data.length}');
       return (r.data as List)
           .map((e) => SiteModel.fromJson(e as Map<String, dynamic>))
           .toList();
     } catch (e) {
-      debugPrint('[SiteRepository] ✗ ERROR fetching sites: $e');
+      debugPrint('[SiteRepository] ✗ Sites error: $e');
       rethrow;
     }
   }
 
   Future<SiteModel> createSite(CreateSiteRequest req) async {
-    final r = await _dio.post(AppConstants.endpointSites, data: req.toJson());
-    return SiteModel.fromJson(r.data as Map<String, dynamic>);
+    try {
+      debugPrint('[SiteRepository] Creating site: ${req.name}');
+      final r = await _dio.post(
+          AppConstants.endpointSites, data: req.toJson());
+      debugPrint('[SiteRepository] ✓ Site created');
+      return SiteModel.fromJson(r.data as Map<String, dynamic>);
+    } catch (e) {
+      debugPrint('[SiteRepository] ✗ Create site error: $e');
+      rethrow;
+    }
   }
 
   Future<List<TaskModel>> getTasksForSite(String siteId) async {
     try {
-      final url = AppConstants.endpointSiteTasks.replaceAll('{siteId}', siteId);
-      debugPrint('[SiteRepository] Fetching tasks from: $url');
+      final url =
+          AppConstants.endpointSiteTasks.replaceAll('{siteId}', siteId);
+      debugPrint('[SiteRepository] Fetching tasks: $url');
       final r = await _dio.get(url);
-      debugPrint('[SiteRepository] ✓ Tasks loaded. Count: ${r.data.length}');
+      debugPrint('[SiteRepository] ✓ Tasks: ${r.data.length}');
       return (r.data as List)
           .map((e) => TaskModel.fromJson(e as Map<String, dynamic>))
           .toList();
     } catch (e) {
-      debugPrint('[SiteRepository] ✗ ERROR fetching tasks: $e');
+      debugPrint('[SiteRepository] ✗ Tasks error: $e');
       rethrow;
     }
   }
 
   Future<TaskModel> createTask(CreateTaskRequest req) async {
-    final r = await _dio.post(AppConstants.endpointTasks, data: req.toJson());
-    return TaskModel.fromJson(r.data as Map<String, dynamic>);
-  }
-
-  Future<TaskModel> updateTaskStatus(String taskId, TaskStatus status) async {
-    final r = await _dio.patch(
-      '${AppConstants.endpointTasks}/$taskId/status',
-      data: {'status': status.apiValue},
-    );
-    return TaskModel.fromJson(r.data as Map<String, dynamic>);
-  }
-
-  // Shape A — returns wrapped: { "user": { "id":..., "name":..., ... } }
-  Future<List<SiteMemberModel>> getSiteMembers(String siteId) async {
     try {
-      final url = AppConstants.endpointSiteMembers.replaceAll('{id}', siteId);
-      debugPrint('[SiteRepository] Fetching site members from: $url');
-      final r = await _dio.get(url);
-      debugPrint('[SiteRepository] ✓ Site members loaded. Count: ${r.data.length}');
-      return (r.data as List)
-          .map((e) => SiteMemberModel.fromJson(e as Map<String, dynamic>))
-          .toList();
+      debugPrint('[SiteRepository] Creating task: ${req.title}');
+      final r = await _dio.post(
+          AppConstants.endpointTasks, data: req.toJson());
+      debugPrint('[SiteRepository] ✓ Task created');
+      return TaskModel.fromJson(r.data as Map<String, dynamic>);
     } catch (e) {
-      debugPrint('[SiteRepository] ✗ ERROR fetching site members: $e');
+      debugPrint('[SiteRepository] ✗ Create task error: $e');
       rethrow;
     }
   }
 
-  // ── FIX 3: was calling /api/admin/users (wrong — needs ADMIN role guard
-  //           AND returns ALL users including inactive/pending)
-  //           now calls /api/admin/users/active (correct endpoint) ──────────
-  // Shape B — returns flat: { "id":..., "name":..., "employeeId":..., "role":... }
-  Future<List<SiteMemberModel>> getAllActiveUsers() async {
+  Future<TaskModel> updateTaskStatus(
+      String taskId, TaskStatus status) async {
     try {
       debugPrint(
-        '[SiteRepository] Fetching all active users from: ${AppConstants.endpointAllActiveUsers}',
+          '[SiteRepository] Updating task $taskId status → ${status.apiValue}');
+      final r = await _dio.patch(
+        '${AppConstants.endpointTasks}/$taskId/status',
+        data: {'status': status.apiValue},
       );
-      final r = await _dio.get(AppConstants.endpointAllActiveUsers);
-      debugPrint('[SiteRepository] ✓ All active users loaded. Count: ${r.data.length}');
+      debugPrint('[SiteRepository] ✓ Status updated');
+      return TaskModel.fromJson(r.data as Map<String, dynamic>);
+    } catch (e) {
+      debugPrint('[SiteRepository] ✗ Status update error: $e');
+      rethrow;
+    }
+  }
+
+  // NEW — admin updates task description
+  Future<TaskModel> updateTaskDescription(
+      String taskId, String? description) async {
+    try {
+      debugPrint('[SiteRepository] Updating task $taskId description');
+      final r = await _dio.patch(
+        '${AppConstants.endpointTasks}/$taskId/description',
+        data: {'description': description ?? ''},
+      );
+      debugPrint('[SiteRepository] ✓ Description updated');
+      return TaskModel.fromJson(r.data as Map<String, dynamic>);
+    } catch (e) {
+      debugPrint('[SiteRepository] ✗ Description update error: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<SiteMemberModel>> getSiteMembers(String siteId) async {
+    try {
+      final url =
+          AppConstants.endpointSiteMembers.replaceAll('{id}', siteId);
+      debugPrint('[SiteRepository] Fetching site members: $url');
+      final r = await _dio.get(url);
+      debugPrint('[SiteRepository] ✓ Site members: ${r.data.length}');
       return (r.data as List)
           .map((e) => SiteMemberModel.fromJson(e as Map<String, dynamic>))
           .toList();
     } catch (e) {
-      debugPrint('[SiteRepository] ✗ ERROR fetching all active users: $e');
+      debugPrint('[SiteRepository] ✗ Site members error: $e');
+      rethrow;
+    }
+  }
+
+  // FIX: was calling endpointUsers (/api/admin/users — admin only)
+  // now calls endpointAllMembers (/api/admin/users/active — any auth user)
+  Future<List<SiteMemberModel>> getAllActiveUsers() async {
+    try {
+      debugPrint(
+          '[SiteRepository] Fetching all active users: ${AppConstants.endpointAllMembers}');
+      final r = await _dio.get(AppConstants.endpointAllMembers);
+      debugPrint('[SiteRepository] ✓ All active users: ${r.data.length}');
+      return (r.data as List)
+          .map((e) => SiteMemberModel.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      debugPrint('[SiteRepository] ✗ getAllActiveUsers error: $e');
       rethrow;
     }
   }

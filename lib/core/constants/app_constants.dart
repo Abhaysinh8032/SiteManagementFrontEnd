@@ -7,8 +7,8 @@ class AppConstants {
   // Change this to your Render URL in production
   // Use localhost for Web (browser), and the emulator host for Android.
   static String get baseUrl => kIsWeb
-      ? 'https://sitemanagementbackend.onrender.com'
-      : 'http://10.0.2.2:8081';
+      ? 'http://localhost:8081'
+      : 'https://sitemanagementbackend.onrender.com';
   static const int connectTimeoutMs = 60000;
   static const int receiveTimeoutMs = 60000;
 
@@ -33,6 +33,7 @@ class AppConstants {
   static const String endpointTasks = '/api/tasks';
   static const String endpointSiteTasks = '/api/tasks/site/{siteId}';
   static const String endpointAllActiveUsers = '/api/admin/users/active';
+  static const String endpointAllMembers = '/api/admin/users/active';
 
   // Routes
   static const String routeLogin = '/login';
