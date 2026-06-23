@@ -130,6 +130,7 @@ class _Sidebar extends StatelessWidget {
   final bool isAdmin;
   final String initials;
   final Map<String, String?> cachedUser;
+
   const _Sidebar({
     required this.state,
     required this.isAdmin,
@@ -215,55 +216,80 @@ class _Sidebar extends StatelessWidget {
                     },
                   ),
           ),
+
+          // FIXED: Admin section now correctly stacks BOTH buttons!
           if (isAdmin)
             Padding(
-              padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(8),
-                onTap: () {
-                  if (Navigator.canPop(context)) Navigator.pop(context);
-                  showModalBottomSheet(
-                    context: context,
-                    isScrollControlled: true,
-                    backgroundColor: Colors.transparent,
-                    builder: (_) => BlocProvider.value(
-                      value: context.read<HomeBloc>(),
-                      child: const CreateSiteBottomSheet(),
-                    ),
-                  );
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 10,
-                    horizontal: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      color: AppColors.primary.withOpacity(0.4),
-                    ),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.add_rounded,
-                        color: AppColors.primary,
-                        size: 18,
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: Column(
+                children: [
+                  // 1. New Site Button
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      icon: const Icon(
+                        Icons.add_location_alt_rounded,
+                        size: 16,
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'New Site',
-                        style: GoogleFonts.lato(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.primary,
+                      label: const Text('New Site'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        side: BorderSide(
+                          color: AppColors.primary.withOpacity(0.4),
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
                         ),
                       ),
-                    ],
+                      onPressed: () {
+                        if (Navigator.canPop(context)) Navigator.pop(context);
+                        showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (_) => BlocProvider.value(
+                            value: context.read<HomeBloc>(),
+                            child: const CreateSiteBottomSheet(),
+                          ),
+                        );
+                      },
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 8),
+                  // 2. Global New Task Button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.add_task_rounded, size: 16),
+                      label: const Text('New Task'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      onPressed: () {
+                        if (Navigator.canPop(context)) Navigator.pop(context);
+                        showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (_) => BlocProvider.value(
+                            value: context.read<HomeBloc>(),
+                            child: GlobalAddTaskBottomSheet(
+                              sites: state.sites,
+                              members: state.allUsers,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
             ),
+
           const Divider(color: AppColors.divider, height: 1),
           _UserFooter(initials: initials, cachedUser: cachedUser),
         ],
