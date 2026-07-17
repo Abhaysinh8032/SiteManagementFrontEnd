@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart'; // <-- ADDED THIS IMPORT
 import '../../data/models/site_task_models.dart';
 import '../../data/repositories/site_repository.dart';
 
@@ -51,6 +52,16 @@ class HomeTaskDescriptionUpdated extends HomeEvent {
   List<Object?> get props => [taskId, description];
 }
 
+class HomeTaskImagesUploadRequested extends HomeEvent {
+  final String taskId;
+  final List<XFile> files;
+
+  const HomeTaskImagesUploadRequested(this.taskId, this.files);
+
+  @override
+  List<Object?> get props => [taskId, files];
+}
+
 class HomeState extends Equatable {
   final List<SiteModel> sites;
   final SiteModel? selectedSite;
@@ -70,6 +81,7 @@ class HomeState extends Equatable {
     this.actionLoading = false,
     this.errorMessage,
   });
+
   HomeState copyWith({
     List<SiteModel>? sites,
     SiteModel? selectedSite,
@@ -92,6 +104,7 @@ class HomeState extends Equatable {
     actionLoading: actionLoading ?? this.actionLoading,
     errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
   );
+
   List<TaskModel> get pendingTasks =>
       tasks.where((t) => t.status == TaskStatus.pending).toList();
   List<TaskModel> get inProgressTasks =>
@@ -102,6 +115,7 @@ class HomeState extends Equatable {
       tasks.where((t) => t.status == TaskStatus.completed).toList();
   List<TaskModel> get onHoldTasks =>
       tasks.where((t) => t.status == TaskStatus.onHold).toList();
+
   @override
   List<Object?> get props => [
     sites,
@@ -127,6 +141,9 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     on<HomeSiteCreateRequested>(_onCreateSite);
     on<HomeTaskStatusChanged>(_onStatusChange);
     on<HomeTaskDescriptionUpdated>(_onUpdateDescription);
+    on<HomeTaskImagesUploadRequested>(
+      _onUploadTaskImages,
+    ); // <-- ADDED THIS LISTENER
   }
 
   Future<void> _onLoad(
@@ -173,7 +190,6 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     List<TaskModel> fetchedTasks = [];
     List<SiteMemberModel> fetchedMembers = [];
 
-    // Step 1: Fetch tasks (this should always work for Admin and Worker)
     try {
       fetchedTasks = await _repo.getTasksForSite(e.site.id);
       debugPrint('[HomeBloc] ✓ Tasks loaded: ${fetchedTasks.length}');
@@ -185,10 +201,9 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
           errorMessage: 'Failed to load tasks.',
         ),
       );
-      return; // Stop here if tasks fail
+      return;
     }
 
-    // Step 2: Fetch members (might throw 403 for workers, but we won't let it crash the app)
     try {
       fetchedMembers = await _repo.getSiteMembers(e.site.id);
     } catch (e) {
@@ -197,7 +212,6 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       );
     }
 
-    // Finally: Emit whatever we successfully loaded
     emit(
       state.copyWith(
         tasks: fetchedTasks,
@@ -281,6 +295,49 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
         state.copyWith(
           actionLoading: false,
           errorMessage: 'Failed to update description.',
+        ),
+      );
+    }
+  }
+
+  // <-- ADDED THIS UPLOAD HANDLER METHOD
+  Future<void> _onUploadTaskImages(
+    HomeTaskImagesUploadRequested event,
+    Emitter<HomeState> emit,
+  ) async {
+    try {
+      emit(state.copyWith(actionLoading: true));
+      final responseTask = await _repo.uploadTaskImages(
+        event.taskId,
+        event.files,
+      );
+
+      final updatedTasks = state.tasks.map((existingTask) {
+        if (existingTask.id == event.taskId) {
+          return TaskModel(
+            id: existingTask.id,
+            siteId: existingTask.siteId,
+            title: existingTask.title,
+            description: existingTask.description,
+            status: existingTask.status,
+            assignedToId: existingTask.assignedToId,
+            assignedToName: existingTask.assignedToName,
+            assignedToEmployeeId: existingTask.assignedToEmployeeId,
+            createdById: existingTask.createdById,
+            createdAt: existingTask.createdAt,
+            images: responseTask.images,
+          );
+        }
+        return existingTask;
+      }).toList();
+
+      emit(state.copyWith(tasks: updatedTasks, actionLoading: false));
+    } catch (e) {
+      debugPrint('[HomeBloc] Failed to upload images: $e');
+      emit(
+        state.copyWith(
+          actionLoading: false,
+          errorMessage: 'Failed to upload images. Please try again.',
         ),
       );
     }

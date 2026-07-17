@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../data/models/site_task_models.dart';
@@ -23,7 +25,6 @@ class TaskCard extends StatelessWidget {
     final hasData = task.title.isNotEmpty && task.title != '(no title)';
 
     return GestureDetector(
-      // FIXED: Now both Admins and Workers can tap the card to update status
       onTap: () => _showStatusMenu(context),
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
@@ -72,7 +73,10 @@ class TaskCard extends StatelessWidget {
       backgroundColor: Colors.transparent,
       builder: (_) => BlocProvider.value(
         value: context.read<HomeBloc>(),
-        child: _StatusSheet(task: task, isAdmin: isAdmin), // Pass isAdmin down
+        child: _TaskActionSheet(
+          task: task,
+          isAdmin: isAdmin,
+        ), // Points to the correct sheet!
       ),
     );
   }
@@ -129,12 +133,86 @@ class _CardContent extends StatelessWidget {
             ),
           ),
         ],
+
+        // ── IMAGE GALLERY WITH FULLSCREEN ZOOM ──
+        if (task.images.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 50,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: task.images.length,
+              itemBuilder: (context, index) {
+                final imageUrl = task.images[index].imageUrl;
+                return GestureDetector(
+                  onTap: () {
+                    showDialog(
+                      context: context,
+                      builder: (context) => Dialog.fullscreen(
+                        backgroundColor: Colors.black.withOpacity(0.9),
+                        child: Stack(
+                          children: [
+                            InteractiveViewer(
+                              minScale: 0.5,
+                              maxScale: 4.0,
+                              child: Center(
+                                child: CachedNetworkImage(
+                                  imageUrl: imageUrl,
+                                  fit: BoxFit.contain,
+                                  placeholder: (context, url) =>
+                                      const CircularProgressIndicator(
+                                        color: AppColors.primary,
+                                      ),
+                                  errorWidget: (context, url, error) =>
+                                      const Icon(
+                                        Icons.broken_image,
+                                        color: Colors.white,
+                                        size: 50,
+                                      ),
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              top: MediaQuery.of(context).padding.top + 10,
+                              right: 16,
+                              child: IconButton(
+                                icon: const Icon(
+                                  Icons.close_rounded,
+                                  color: Colors.white,
+                                  size: 32,
+                                ),
+                                onPressed: () => Navigator.pop(context),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                  child: Container(
+                    width: 50,
+                    margin: const EdgeInsets.only(right: 8),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.divider),
+                      image: DecorationImage(
+                        image: CachedNetworkImageProvider(imageUrl),
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+
+        // ── END IMAGE GALLERY ──
         const SizedBox(height: 10),
         Container(height: 0.5, color: AppColors.divider),
         const SizedBox(height: 8),
         Row(
           children: [
-            // FIXED: Removed the AvatarCircle DP as requested and added a clean icon
             const Icon(
               Icons.person_outline,
               size: 14,
@@ -197,147 +275,12 @@ class _EmptyCardDebug extends StatelessWidget {
           'ID: ${task.id.isEmpty ? "missing" : task.id.substring(0, 8)}...',
           style: GoogleFonts.lato(fontSize: 10, color: AppColors.textHint),
         ),
-        Text(
-          'Check backend response format',
-          style: GoogleFonts.lato(fontSize: 10, color: AppColors.textHint),
-        ),
       ],
     );
   }
 }
 
-// ── Status update bottom sheet ────────────────────────────────────────────────
-
-class _StatusSheet extends StatelessWidget {
-  final TaskModel task;
-  final bool isAdmin;
-
-  const _StatusSheet({required this.task, required this.isAdmin});
-
-  @override
-  Widget build(BuildContext context) {
-    // FIXED: Admin gets all statuses. Workers only get Pending, InProgress, ReviewRequested
-    // This perfectly matches your Spring Boot TaskService backend logic!
-    final statuses = isAdmin
-        ? [
-            TaskStatus.pending,
-            TaskStatus.inProgress,
-            TaskStatus.reviewRequested,
-            TaskStatus.completed,
-            TaskStatus.onHold,
-          ]
-        : [
-            TaskStatus.pending,
-            TaskStatus.inProgress,
-            TaskStatus.reviewRequested,
-          ];
-
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 16),
-              decoration: BoxDecoration(
-                color: AppColors.divider,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          Text(
-            'Update Status',
-            style: GoogleFonts.playfairDisplay(
-              fontSize: 17,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            task.title,
-            style: GoogleFonts.lato(
-              fontSize: 13,
-              color: AppColors.textSecondary,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 16),
-          ...statuses.map((s) {
-            final isSelected = task.status == s;
-            return GestureDetector(
-              onTap: () {
-                context.read<HomeBloc>().add(HomeTaskStatusChanged(task.id, s));
-                Navigator.pop(context);
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 12,
-                ),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? AppColors.statusColor(s).withOpacity(0.08)
-                      : AppColors.background,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: isSelected
-                        ? AppColors.statusColor(s)
-                        : AppColors.divider,
-                    width: isSelected ? 1.5 : 1,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 4,
-                      height: 20,
-                      decoration: BoxDecoration(
-                        color: AppColors.statusColor(s),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      s.label,
-                      style: GoogleFonts.lato(
-                        fontSize: 14,
-                        fontWeight: isSelected
-                            ? FontWeight.w700
-                            : FontWeight.normal,
-                        color: isSelected
-                            ? AppColors.statusColor(s)
-                            : AppColors.textPrimary,
-                      ),
-                    ),
-                    const Spacer(),
-                    if (isSelected)
-                      Icon(
-                        Icons.check_circle_rounded,
-                        color: AppColors.statusColor(s),
-                        size: 20,
-                      ),
-                  ],
-                ),
-              ),
-            );
-          }),
-        ],
-      ),
-    );
-  }
-}
-// ── Task action sheet — status + description edit ─────────────────────────────
+// ── Task action sheet — status + description edit + upload ────────────────────
 
 class _TaskActionSheet extends StatefulWidget {
   final TaskModel task;
@@ -363,15 +306,13 @@ class _TaskActionSheetState extends State<_TaskActionSheet> {
     super.dispose();
   }
 
-  // Statuses a worker can pick
   static const _workerStatuses = [
     TaskStatus.pending,
     TaskStatus.inProgress,
     TaskStatus.onHold,
-    TaskStatus.reviewRequested, // worker submits for admin review
+    TaskStatus.reviewRequested,
   ];
 
-  // Admin sees all statuses including completed
   static const _adminStatuses = [
     TaskStatus.pending,
     TaskStatus.inProgress,
@@ -399,7 +340,6 @@ class _TaskActionSheetState extends State<_TaskActionSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Handle
               Center(
                 child: Container(
                   width: 40,
@@ -411,8 +351,6 @@ class _TaskActionSheetState extends State<_TaskActionSheet> {
                   ),
                 ),
               ),
-
-              // Task title
               Text(
                 widget.task.title,
                 style: GoogleFonts.playfairDisplay(
@@ -431,8 +369,6 @@ class _TaskActionSheetState extends State<_TaskActionSheet> {
                 ),
               ),
               const SizedBox(height: 16),
-
-              // Status options
               Text(
                 'Update Status',
                 style: GoogleFonts.lato(
@@ -507,7 +443,6 @@ class _TaskActionSheetState extends State<_TaskActionSheet> {
                                       : AppColors.textPrimary,
                                 ),
                               ),
-                              // Hint for Review Requested
                               if (s == TaskStatus.reviewRequested)
                                 Text(
                                   'Notify admin your work is ready for review',
@@ -516,7 +451,6 @@ class _TaskActionSheetState extends State<_TaskActionSheet> {
                                     color: AppColors.textHint,
                                   ),
                                 ),
-                              // Hint: completed locked for worker
                               if (isCompletedForWorker)
                                 Text(
                                   'Admin only',
@@ -546,7 +480,86 @@ class _TaskActionSheetState extends State<_TaskActionSheet> {
                 );
               }),
 
-              // Description edit — admin only
+              const SizedBox(height: 16),
+              const Divider(color: AppColors.divider, height: 1),
+              const SizedBox(height: 12),
+
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Attachments',
+                    style: GoogleFonts.lato(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textSecondary,
+                      letterSpacing: 0.4,
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () async {
+                      final picker = ImagePicker();
+                      final pickedFiles = await picker.pickMultiImage(
+                        imageQuality: 70,
+                      );
+
+                      if (pickedFiles.isNotEmpty && context.mounted) {
+                        context.read<HomeBloc>().add(
+                          HomeTaskImagesUploadRequested(
+                            widget.task.id,
+                            pickedFiles,
+                          ),
+                        );
+                        Navigator.pop(context);
+                      }
+                    },
+                    child: Text(
+                      '+ Add Photos',
+                      style: GoogleFonts.lato(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              if (widget.task.images.isNotEmpty)
+                SizedBox(
+                  height: 80,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: widget.task.images.length,
+                    itemBuilder: (context, index) {
+                      return Container(
+                        width: 80,
+                        margin: const EdgeInsets.only(right: 8),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.divider),
+                          image: DecorationImage(
+                            image: CachedNetworkImageProvider(
+                              widget.task.images[index].imageUrl,
+                            ),
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                )
+              else
+                Text(
+                  'No photos uploaded yet.',
+                  style: GoogleFonts.lato(
+                    fontSize: 13,
+                    color: AppColors.textHint,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+
               if (widget.isAdmin) ...[
                 const SizedBox(height: 16),
                 const Divider(color: AppColors.divider, height: 1),

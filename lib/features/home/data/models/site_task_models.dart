@@ -103,6 +103,9 @@ class TaskModel {
   final TaskStatus status;
   final DateTime createdAt;
 
+  // 1. MUST HAVE THIS LINE
+  final List<TaskImageModel> images;
+
   const TaskModel({
     required this.id,
     required this.siteId,
@@ -114,6 +117,8 @@ class TaskModel {
     required this.assignedToEmployeeId,
     required this.createdById,
     required this.createdAt,
+    // 2. MUST HAVE THIS LINE
+    this.images = const [],
   });
 
   factory TaskModel.fromJson(Map<String, dynamic> json) {
@@ -133,10 +138,16 @@ class TaskModel {
         assignedToEmployeeId: at['employeeId']?.toString() ?? '',
         createdById: cb['id']?.toString() ?? '',
         createdAt: _parseDate(json['createdAt']),
+
+        // 3. MUST HAVE THIS LINE to parse the images from the backend
+        images:
+            (json['images'] as List?)
+                ?.map((e) => TaskImageModel.fromJson(e as Map<String, dynamic>))
+                .toList() ??
+            [],
       );
     } catch (e) {
       debugPrint('🚨 Failed to parse a task: $e');
-      // Return a safe dummy task so the app doesn't crash
       return TaskModel(
         id: 'error',
         siteId: '',
@@ -155,22 +166,43 @@ class TaskModel {
   static DateTime _parseDate(dynamic date) {
     if (date == null) return DateTime.now();
     if (date is String) return DateTime.tryParse(date) ?? DateTime.now();
-    if (date is List && date.isNotEmpty) {
+    if (date is List && date.length >= 3) {
+      // Spring Boot's Jackson can serialize dates as an array of numbers
+      // [year, month, day, hour, minute, second, nanosecond]
       return DateTime(
-        date.length > 0 ? date as int : 0,
-        date.length > 1 ? date as int : 1,
-        date.length > 2 ? date as int : 1,
-        date.length > 3 ? date as int : 0,
-        date.length > 4 ? date as int : 0,
+        date[0] as int,
+        date[1] as int,
+        date[2] as int,
+        date.length > 3 ? date[3] as int : 0,
+        date.length > 4 ? date[4] as int : 0,
+        date.length > 5 ? date[5] as int : 0,
       );
     }
     return DateTime.now();
   }
 
   String get assigneeInitials {
+    if (assignedToName.isEmpty || assignedToName == '(unassigned)') return '?';
     final p = assignedToName.trim().split(' ');
-    if (p.length >= 2) return '${p}${p}'.toUpperCase();
-    return assignedToName.isNotEmpty ? assignedToName.toUpperCase() : '?';
+    if (p.isEmpty || p.first.isEmpty) return '?';
+    if (p.length >= 2) return '${p[0][0]}${p[1][0]}'.toUpperCase();
+    return p[0][0].toUpperCase();
+  }
+}
+
+// ── TaskImageModel ────────────────────────────────────────────────────────────
+
+class TaskImageModel {
+  final String id;
+  final String imageUrl;
+
+  const TaskImageModel({required this.id, required this.imageUrl});
+
+  factory TaskImageModel.fromJson(Map<String, dynamic> json) {
+    return TaskImageModel(
+      id: json['id'] as String? ?? '',
+      imageUrl: json['imageUrl'] as String? ?? '',
+    );
   }
 }
 
