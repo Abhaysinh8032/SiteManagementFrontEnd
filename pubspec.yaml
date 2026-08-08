@@ -51,6 +51,8 @@ dependencies:
   # Image Caching
   cached_network_image: ^3.3.1
   image_picker: ^1.2.3
+  firebase_core: ^4.12.1
+  firebase_messaging: ^16.4.3
 
 dev_dependencies:
   flutter_test:

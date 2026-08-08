@@ -14,6 +14,8 @@ import '../widgets/add_task_sheet.dart';
 import '../widgets/create_site_sheet.dart';
 import '../widgets/user_profile_sheet.dart';
 import '../widgets/global_add_task_sheet.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import '../../../../core/network/api_client.dart';
 
 class HomeScreen extends StatefulWidget {
   final String role;
@@ -31,6 +33,32 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _loadUser();
     context.read<HomeBloc>().add(const HomeSitesLoadRequested());
+    _setupPushNotifications(); // <-- ADD THIS
+  }
+
+  Future<void> _setupPushNotifications() async {
+    FirebaseMessaging messaging = FirebaseMessaging.instance;
+
+    // Request permission (triggers prompt on iOS, required for Android 13+)
+    NotificationSettings settings = await messaging.requestPermission();
+
+    if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+      String? token = await messaging.getToken();
+      final u = await SecureStorageService().getCachedUser();
+      final userId = u['id'] ?? u['userId'];
+
+      if (token != null && userId != null) {
+        try {
+          // Send the token to the new Spring Boot endpoint
+          await ApiClient.instance.dio.patch(
+            '/api/users/$userId/fcm-token',
+            data: {'fcmToken': token},
+          );
+        } catch (e) {
+          debugPrint('Failed to sync FCM token: $e');
+        }
+      }
+    }
   }
 
   Future<void> _loadUser() async {
